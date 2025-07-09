@@ -1,15 +1,159 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>帝国 - 占领类RPG</title>
-    <style>
-        /* ... 样式代码 ... */
-    </style>
-</head>
-<body>
-    <div id="game"></div>
-    <script src="game.js"></script>
-</body>
-</html>
+// 游戏主类
+class Empire {
+    constructor() {
+        this.races = {
+            human: { name: { zh: '人类', en: 'Human' }, bonus: { resources: 1.2, troops: 1.0, population: 1.1 } },
+            elf: { name: { zh: '精灵', en: 'Elf' }, bonus: { resources: 1.1, troops: 0.9, population: 1.2 } },
+            dwarf: { name: { zh: '矮人', en: 'Dwarf' }, bonus: { resources: 1.3, troops: 1.1, population: 0.9 } },
+            orc: { name: { zh: '兽人', en: 'Orc' }, bonus: { resources: 0.9, troops: 1.3, population: 1.0 } }
+        };
+
+        this.regions = {
+            plains: { name: { zh: '平原', en: 'Plains' }, bonus: { resources: 1.1, troops: 1.0, population: 1.2 } },
+            mountain: { name: { zh: '山地', en: 'Mountain' }, bonus: { resources: 1.3, troops: 0.9, population: 0.8 } },
+            forest: { name: { zh: '森林', en: 'Forest' }, bonus: { resources: 1.2, troops: 1.1, population: 0.9 } },
+            desert: { name: { zh: '沙漠', en: 'Desert' }, bonus: { resources: 0.8, troops: 1.2, population: 0.7 } }
+        };
+
+        this.player = {
+            name: '指挥官',
+            race: 'human',
+            level: 1,
+            exp: 0,
+            gold: 1000,
+            territories: ['首都']
+        };
+
+        this.territories = {
+            '首都': {
+                resources: 100,
+                troops: 50,
+                population: 1000,
+                region: 'plains',
+                race: 'human'
+            }
+        };
+
+        this.init();
+    }
+
+    init() {
+        console.log("帝国初始化完成！");
+    }
+
+    getTerritoryBonus(territoryName) {
+        const t = this.territories[territoryName];
+        const raceBonus = this.races[t.race].bonus;
+        const regionBonus = this.regions[t.region].bonus;
+
+        return {
+            resources: raceBonus.resources * regionBonus.resources,
+            troops: raceBonus.troops * regionBonus.troops,
+            population: raceBonus.population * regionBonus.population
+        };
+    }
+
+    gainExp(amount) {
+        this.player.exp += amount;
+        const required = this.player.level * 100;
+        if (this.player.exp >= required) {
+            this.player.level++;
+            this.player.exp -= required;
+            alert(`恭喜 ${this.player.name} 升到了 ${this.player.level} 级！`);
+        }
+    }
+
+    collectResources() {
+        for (const name in this.territories) {
+            const bonus = this.getTerritoryBonus(name);
+            const territory = this.territories[name];
+            territory.resources += Math.floor(10 * bonus.resources);
+            territory.population += Math.floor(5 * bonus.population);
+        }
+        alert("资源已更新！");
+    }
+
+    addTerritory(name, region, race) {
+        if (this.territories[name]) {
+            alert("该领地已存在。");
+            return;
+        }
+        this.territories[name] = {
+            resources: 50,
+            troops: 20,
+            population: 500,
+            region,
+            race
+        };
+        this.player.territories.push(name);
+        alert(`成功新增领地：${name}`);
+    }
+
+    recruitTroops(territoryName, count) {
+        const territory = this.territories[territoryName];
+        if (!territory) return alert("领地不存在");
+        if (territory.population < count) return alert("人口不足征兵");
+
+        territory.troops += count;
+        territory.population -= count;
+        alert(`${territoryName} 征兵 ${count} 人。`);
+    }
+
+    battle(attackerName, defenderName) {
+        const attacker = this.territories[attackerName];
+        const defender = this.territories[defenderName];
+        if (!attacker || !defender) return alert("无效的战斗目标。");
+
+        const attackerBonus = this.getTerritoryBonus(attackerName).troops;
+        const defenderBonus = this.getTerritoryBonus(defenderName).troops;
+
+        const attackerPower = attacker.troops * attackerBonus;
+        const defenderPower = defender.troops * defenderBonus;
+
+        let result;
+        if (attackerPower > defenderPower) {
+            attacker.troops = Math.floor(attacker.troops * 0.7);
+            defender.troops = 0;
+            result = `${attackerName} 胜利，占领 ${defenderName}！`;
+            this.player.territories.push(defenderName);
+        } else if (attackerPower < defenderPower) {
+            attacker.troops = 0;
+            defender.troops = Math.floor(defender.troops * 0.7);
+            result = `${attackerName} 进攻失败，被击退。`;
+        } else {
+            attacker.troops = 0;
+            defender.troops = 0;
+            result = `双方同归于尽！`;
+        }
+
+        alert(result);
+    }
+
+    render() {
+        const container = document.getElementById('game');
+        const player = this.player;
+        const capital = this.territories['首都'];
+
+        container.innerHTML = `
+            <h1>${player.name} 的帝国</h1>
+            <p>种族：${this.races[player.race].name.zh}</p>
+            <p>等级：${player.level}（经验：${player.exp}）</p>
+            <p>金币：${player.gold}</p>
+            <hr>
+            <h2>领地：首都</h2>
+            <p>资源：${capital.resources}</p>
+            <p>军队：${capital.troops}</p>
+            <p>人口：${capital.population}</p>
+            <hr>
+            <button onclick="game.collectResources(); game.render();">收集资源</button>
+            <button onclick="game.recruitTroops('首都', 10); game.render();">征兵 10</button>
+            <button onclick="game.gainExp(100); game.render();">获得经验 100</button>
+            <button onclick="game.addTerritory('敌营', 'mountain', 'orc'); game.render();">生成敌营</button>
+            <button onclick="game.battle('首都', '敌营'); game.render();">攻打敌营</button>
+        `;
+    }
+}
+
+// 启动游戏
+const game = new Empire();
+game.render();
