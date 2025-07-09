@@ -1,0 +1,92 @@
+index.html<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>重生的黑暗骑士</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; margin: auto; }
+  </style>
+</head>
+<body>
+<script>
+class MainScene extends Phaser.Scene {
+  constructor() {
+    super('MainScene');
+  }
+
+  preload() {
+    this.load.image('knight', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+    this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
+    this.load.image('coin', 'https://labs.phaser.io/assets/sprites/coin.png');
+  }
+
+  create() {
+    this.platforms = this.physics.add.staticGroup();
+    this.platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+
+    this.knight = this.physics.add.sprite(100, 450, 'knight');
+    this.knight.setBounce(0.2);
+    this.knight.setCollideWorldBounds(true);
+
+    this.physics.add.collider(this.knight, this.platforms);
+
+    this.coins = this.physics.add.group({
+      key: 'coin',
+      repeat: 5,
+      setXY: { x: 150, y: 0, stepX: 120 }
+    });
+
+    this.coins.children.iterate((coin) => {
+      coin.setBounceY(Phaser.Math.FloatBetween(0.3, 0.6));
+    });
+
+    this.physics.add.collider(this.coins, this.platforms);
+    this.physics.add.overlap(this.knight, this.coins, this.collectCoin, null, this);
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+
+    this.score = 0;
+    this.scoreText = this.add.text(16, 16, '金币: 0', { fontSize: '20px', fill: '#fff' });
+  }
+
+  collectCoin(player, coin) {
+    coin.disableBody(true, true);
+    this.score += 10;
+    this.scoreText.setText('金币: ' + this.score);
+  }
+
+  update() {
+    if (this.cursors.left.isDown) {
+      this.knight.setVelocityX(-160);
+    } else if (this.cursors.right.isDown) {
+      this.knight.setVelocityX(160);
+    } else {
+      this.knight.setVelocityX(0);
+    }
+
+    if (this.cursors.up.isDown && this.knight.body.touching.down) {
+      this.knight.setVelocityY(-330);
+    }
+  }
+}
+
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 500 },
+      debug: false
+    }
+  },
+  scene: MainScene
+};
+
+new Phaser.Game(config);
+</script>
+</body>
+</html>
