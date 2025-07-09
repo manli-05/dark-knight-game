@@ -14,6 +14,7 @@
 class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
+    this.level = 1;
   }
 
   preload() {
@@ -25,9 +26,29 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
+    this.initLevel();
+
+    // 控制与 UI
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.score = 0;
+    this.scoreText = this.add.text(16, 16, '金币: 0', { fontSize: '20px', fill: '#fff' });
+    this.health = 3;
+    this.healthText = this.add.text(16, 40, '生命: 3', { fontSize: '20px', fill: '#fff' });
+  }
+
+  initLevel() {
+    this.physics.world.colliders.destroy();
+    if (this.platforms) this.platforms.clear(true, true);
+    if (this.coins) this.coins.clear(true, true);
+    if (this.enemies) this.enemies.clear(true, true);
+    if (this.shop) this.shop.destroy();
+    if (this.knight) this.knight.destroy();
+
     // 地图平台
     this.platforms = this.physics.add.staticGroup();
     this.platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+    if (this.level >= 2) this.platforms.create(600, 400, 'ground');
+    if (this.level >= 3) this.platforms.create(200, 300, 'ground');
 
     // 玩家角色
     this.knight = this.physics.add.sprite(100, 450, 'knight');
@@ -45,29 +66,30 @@ class MainScene extends Phaser.Scene {
 
     // 敌人系统
     this.enemies = this.physics.add.group();
-    const enemy = this.enemies.create(500, 450, 'enemy');
+    const enemy = this.enemies.create(500 + this.level * 20, 450 - this.level * 50, 'enemy');
     enemy.setBounce(1);
     enemy.setCollideWorldBounds(true);
-    enemy.setVelocityX(100);
+    enemy.setVelocityX(100 + this.level * 20);
     this.physics.add.collider(this.enemies, this.platforms);
     this.physics.add.collider(this.knight, this.enemies, this.hitEnemy, null, this);
 
     // 商店入口
     this.shop = this.physics.add.staticSprite(750, 500, 'shop');
     this.physics.add.overlap(this.knight, this.shop, this.enterShop, null, this);
-
-    // 控制与 UI
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.score = 0;
-    this.scoreText = this.add.text(16, 16, '金币: 0', { fontSize: '20px', fill: '#fff' });
-    this.health = 3;
-    this.healthText = this.add.text(16, 40, '生命: 3', { fontSize: '20px', fill: '#fff' });
   }
 
   collectCoin(player, coin) {
     coin.disableBody(true, true);
     this.score += 10;
     this.scoreText.setText('金币: ' + this.score);
+
+    if (this.coins.countActive(true) === 0) {
+      this.level++;
+      this.add.text(300, 200, `进入第 ${this.level} 关！`, { fontSize: '24px', fill: '#0f0' });
+      this.time.delayedCall(1000, () => {
+        this.initLevel();
+      });
+    }
   }
 
   hitEnemy(player, enemy) {
@@ -82,10 +104,12 @@ class MainScene extends Phaser.Scene {
   }
 
   enterShop() {
-    alert(`欢迎来到商店！你有 ${this.score} 金币。\n（后续功能开发中）`);
+    alert(`欢迎来到商店（第 ${this.level} 关）！你有 ${this.score} 金币。\n（后续功能开发中）`);
   }
 
   update() {
+    if (!this.knight.active) return;
+
     if (this.cursors.left.isDown) {
       this.knight.setVelocityX(-160);
     } else if (this.cursors.right.isDown) {
