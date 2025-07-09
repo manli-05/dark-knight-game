@@ -1,8 +1,8 @@
-index.html<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>重生的黑暗骑士</title>
+  <title>重生的黑暗骑士 RPG</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
   <style>
     body { margin: 0; }
@@ -20,41 +20,69 @@ class MainScene extends Phaser.Scene {
     this.load.image('knight', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
     this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
     this.load.image('coin', 'https://labs.phaser.io/assets/sprites/coin.png');
+    this.load.image('enemy', 'https://labs.phaser.io/assets/sprites/baddie.png');
+    this.load.image('shop', 'https://labs.phaser.io/assets/sprites/block.png');
   }
 
   create() {
+    // 地图平台
     this.platforms = this.physics.add.staticGroup();
     this.platforms.create(400, 568, 'ground').setScale(2).refreshBody();
 
+    // 玩家角色
     this.knight = this.physics.add.sprite(100, 450, 'knight');
     this.knight.setBounce(0.2);
     this.knight.setCollideWorldBounds(true);
-
     this.physics.add.collider(this.knight, this.platforms);
 
-    this.coins = this.physics.add.group({
-      key: 'coin',
-      repeat: 5,
-      setXY: { x: 150, y: 0, stepX: 120 }
-    });
-
+    // 金币系统
+    this.coins = this.physics.add.group({ key: 'coin', repeat: 4, setXY: { x: 150, y: 0, stepX: 120 } });
     this.coins.children.iterate((coin) => {
       coin.setBounceY(Phaser.Math.FloatBetween(0.3, 0.6));
     });
-
     this.physics.add.collider(this.coins, this.platforms);
     this.physics.add.overlap(this.knight, this.coins, this.collectCoin, null, this);
 
-    this.cursors = this.input.keyboard.createCursorKeys();
+    // 敌人系统
+    this.enemies = this.physics.add.group();
+    const enemy = this.enemies.create(500, 450, 'enemy');
+    enemy.setBounce(1);
+    enemy.setCollideWorldBounds(true);
+    enemy.setVelocityX(100);
+    this.physics.add.collider(this.enemies, this.platforms);
+    this.physics.add.collider(this.knight, this.enemies, this.hitEnemy, null, this);
 
+    // 商店入口
+    this.shop = this.physics.add.staticSprite(750, 500, 'shop');
+    this.physics.add.overlap(this.knight, this.shop, this.enterShop, null, this);
+
+    // 控制与 UI
+    this.cursors = this.input.keyboard.createCursorKeys();
     this.score = 0;
     this.scoreText = this.add.text(16, 16, '金币: 0', { fontSize: '20px', fill: '#fff' });
+    this.health = 3;
+    this.healthText = this.add.text(16, 40, '生命: 3', { fontSize: '20px', fill: '#fff' });
   }
 
   collectCoin(player, coin) {
     coin.disableBody(true, true);
     this.score += 10;
     this.scoreText.setText('金币: ' + this.score);
+  }
+
+  hitEnemy(player, enemy) {
+    this.health -= 1;
+    this.healthText.setText('生命: ' + this.health);
+    if (this.health <= 0) {
+      this.physics.pause();
+      this.knight.setTint(0xff0000);
+      this.knight.anims.stop();
+      this.scoreText.setText('你死了，游戏结束！');
+    }
+  }
+
+  enterShop() {
+    alert(`欢迎来到商店！你有 ${this.score} 金币。\n（后续功能开发中）`);
   }
 
   update() {
