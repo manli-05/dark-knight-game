@@ -6,177 +6,25 @@
   <style>
     body {
       margin: 0;
-      background-color: #111;
-      font-family: 'Press Start 2P', monospace;
-      color: #fff;
+      background: black;
       overflow: hidden;
+      font-family: 'Press Start 2P', monospace;
     }
     canvas {
-      display: none;
+      display: block;
+      margin: 0 auto;
+      background-color: #222;
       image-rendering: pixelated;
-      cursor: grab;
-    }
-    #city-popup, #start-screen {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.9);
-      border: 2px solid #ccc;
-      padding: 20px;
-      z-index: 999;
-      text-align: center;
-    }
-    #start-screen button {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 16px;
-      background: #4caf50;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      cursor: pointer;
-    }
-    #start-screen h1 {
-      margin-bottom: 20px;
     }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-<div id="start-screen">
-  <h1>帝国游戏</h1>
-  <p>万国觉醒：征服与荣耀</p>
-  <button onclick="startGame()">开始游戏</button>
-</div>
-<canvas id="gameCanvas" width="1200" height="800"></canvas>
+<canvas id="gameCanvas" width="1024" height="768"></canvas>
+<audio id="upgrade-sfx" src="https://cdn.pixabay.com/download/audio/2022/10/24/audio_7e3ae7d295.mp3" preload="auto"></audio>
+<audio id="capture-sfx" src="https://cdn.pixabay.com/download/audio/2021/09/08/audio_96b6ec56c5.mp3" preload="auto"></audio>
 <script>
-function startGame() {
-  document.getElementById('start-screen').style.display = 'none';
-  document.getElementById('gameCanvas').style.display = 'block';
-  drawMap();
-}
 
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-let scale = 1;
-let offsetX = 0;
-let offsetY = 0;
-
-const cities = [
-  { name: "都城", x: 150, y: 150, level: 1, conquered: false, defense: 10, race: "人族" },
-  { name: "边境", x: 400, y: 120, level: 2, conquered: false, defense: 15, race: "兽人" },
-  { name: "矿区", x: 650, y: 220, level: 3, conquered: false, defense: 18, race: "矮人" },
-  { name: "森林", x: 300, y: 400, level: 2, conquered: false, defense: 12, race: "精灵" },
-  { name: "港口", x: 550, y: 450, level: 4, conquered: false, defense: 20, race: "人族" }
-];
-
-function drawMap() {
-  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
-  ctx.fillStyle = '#222';
-  ctx.fillRect(-offsetX / scale, -offsetY / scale, canvas.width / scale, canvas.height / scale);
-
-  cities.forEach(city => {
-    ctx.fillStyle = city.conquered ? '#4caf50' : (aiCities.includes(city.name) ? '#f44336' : '#ccc');
-    ctx.fillRect(city.x - 10, city.y - 10, 20, 20);
-    ctx.fillStyle = '#fff';
-    ctx.font = '10px "Press Start 2P"';
-    ctx.fillText(city.name, city.x - 20, city.y - 15);
-    ctx.fillText(city.race, city.x - 20, city.y + 40);
-    for (let i = 0; i < city.level; i++) {
-      ctx.fillText('★', city.x - 8 + i * 10, city.y + 25);
-    }
-  });
-}
-
-canvas.addEventListener("click", e => {
-  const x = (e.offsetX - offsetX) / scale;
-  const y = (e.offsetY - offsetY) / scale;
-  cities.forEach(city => {
-    if (x >= city.x - 10 && x <= city.x + 10 && y >= city.y - 10 && y <= city.y + 10) {
-      showCityPopup(city);
-    }
-  });
-});
-
-canvas.addEventListener("wheel", e => {
-  e.preventDefault();
-  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
-  scale *= zoom;
-  drawMap();
-});
-
-function showCityPopup(city) {
-  const popup = document.createElement('div');
-  popup.id = 'city-popup';
-  popup.innerHTML = `
-    <h3>${city.name}</h3>
-    <p>种族：${city.race}</p>
-    <p>等级：${city.level} ⭐</p>
-    <p>防御力：${city.defense}</p>
-    <p>状态：${city.conquered ? '我方控制' : (aiCities.includes(city.name) ? '敌方控制' : '中立')}</p>
-    ${!city.conquered ? '<button onclick="attack(cities.find(c=>c.name===\'' + city.name + '\'))">发起进攻</button>' : ''}
-    <br><button onclick="document.getElementById('city-popup').remove()">关闭</button>
-  `;
-  document.body.appendChild(popup);
-}
-
-let resources = 100;
-let army = 50;
-let aiCities = [];
-
-function attack(city) {
-  if (city.conquered) return alert('此城市已被占领');
-  if (army < 10) return alert('兵力不足，无法进攻！');
-  const result = army - (city.defense + (city.tower ? 10 : 0)) + city.level * 5;
-  const win = result >= 0;
-  if (win) {
-    city.conquered = true;
-    city.garrison = 5;
-    city.level = Math.min(city.level + 1, 5);
-    resources += city.level * 20;
-    drawMap();
-  } else {
-    alert('进攻失败');
-  }
-  army -= 10;
-}
-
-function aiAttack() {
-  const targets = cities.filter(c => c.conquered);
-  const empty = cities.filter(c => !c.conquered && !aiCities.includes(c.name));
-  if (Math.random() < 0.5 && empty.length > 0) {
-    const target = empty[Math.floor(Math.random() * empty.length)];
-    aiCities.push(target.name);
-    drawMap();
-    return;
-  }
-  if (targets.length === 0) return;
-  const target = targets[Math.floor(Math.random() * targets.length)];
-  const aiPower = 20 + Math.floor(Math.random() * 30);
-  const defense = (target.garrison || 0) + (target.tower ? 10 : 0);
-  const win = aiPower > defense;
-  if (win) {
-    target.conquered = false;
-    target.garrison = 0;
-    aiCities.push(target.name);
-    alert(`⚔️ 敌军占领了你的城市：${target.name}`);
-    drawMap();
-  }
-}
-
-setInterval(() => {
-  cities.forEach(city => {
-    if (city.conquered) {
-      resources += city.level * 2;
-      if (city.garrison < 20) city.garrison += 1;
-    }
-  });
-  if (army < 100) army += 1;
-}, 5000);
-
-setInterval(() => {
-  aiAttack();
-}, 15000);
 </script>
 </body>
 </html>
