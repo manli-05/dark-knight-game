@@ -1,159 +1,209 @@
-// 游戏主类
-class Empire {
-    constructor() {
-        this.races = {
-            human: { name: { zh: '人类', en: 'Human' }, bonus: { resources: 1.2, troops: 1.0, population: 1.1 } },
-            elf: { name: { zh: '精灵', en: 'Elf' }, bonus: { resources: 1.1, troops: 0.9, population: 1.2 } },
-            dwarf: { name: { zh: '矮人', en: 'Dwarf' }, bonus: { resources: 1.3, troops: 1.1, population: 0.9 } },
-            orc: { name: { zh: '兽人', en: 'Orc' }, bonus: { resources: 0.9, troops: 1.3, population: 1.0 } }
-        };
 
-        this.regions = {
-            plains: { name: { zh: '平原', en: 'Plains' }, bonus: { resources: 1.1, troops: 1.0, population: 1.2 } },
-            mountain: { name: { zh: '山地', en: 'Mountain' }, bonus: { resources: 1.3, troops: 0.9, population: 0.8 } },
-            forest: { name: { zh: '森林', en: 'Forest' }, bonus: { resources: 1.2, troops: 1.1, population: 0.9 } },
-            desert: { name: { zh: '沙漠', en: 'Desert' }, bonus: { resources: 0.8, troops: 1.2, population: 0.7 } }
-        };
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>帝国游戏</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      color: white;
+      text-shadow: 1px 1px 3px black;
+      background-size: cover;
+      background-attachment: fixed;
+    }
+    .panel {
+      padding: 10px;
+      background: rgba(0,0,0,0.5);
+      max-width: 480px;
+    }
+    #map button {
+      margin: 4px;
+      padding: 8px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>帝国征服</h1>
+    <label for="race">选择种族：</label>
+    <select id="race" onchange="selectRace()"></select>
+    <p id="info"></p>
+    <button onclick="useSkill()">使用种族技能</button>
+    <div id="map"></div>
+  </div>
 
-        this.player = {
-            name: '指挥官',
-            race: 'human',
-            level: 1,
-            exp: 0,
-            gold: 1000,
-            territories: ['首都']
-        };
+  <script>
+    let race = localStorage.getItem('race') || null;
+    let cities = [];
+    let conquered = JSON.parse(localStorage.getItem('conquered') || '[]');
+    let cooldown = 0;
 
-        this.territories = {
-            '首都': {
-                resources: 100,
-                troops: 50,
-                population: 1000,
-                region: 'plains',
-                race: 'human'
-            }
-        };
+    const races = {
+      human: { name: '人类', bonus: '金币产量+20%', skill: () => addGold(200), base: 0 },
+      orc: { name: '兽人', bonus: '军队增长+2', skill: () => addArmy(50), base: 100 },
+      elf: { name: '精灵', bonus: '占领奖励翻倍', skill: () => addArmy(3), base: 200 },
+      undead: { name: '亡灵', bonus: '失败复活50%', skill: () => { addGold(50); addArmy(30); }, base: 300 },
+      dwarf: { name: '矮人', bonus: '城市升级便宜', skill: () => upgradeCity(), base: 400 }
+    };
 
-        this.init();
+    function generateCities() {
+      let cityList = [];
+      let raceStart = {
+        human: { prefix: '王国', base: 0, bg: 'bg_human.jpg' },
+        orc: { prefix: '兽域', base: 100, bg: 'bg_orc.jpg' },
+        elf: { prefix: '精灵林', base: 200, bg: 'bg_elf.jpg' },
+        undead: { prefix: '亡魂地', base: 300, bg: 'bg_undead.jpg' },
+        dwarf: { prefix: '矮人山', base: 400, bg: 'bg_dwarf.jpg' }
+      };
+
+      let start = raceStart[race]?.base || 0;
+      let prefix = raceStart[race]?.prefix || '敌城';
+      let bg = raceStart[race]?.bg || 'default_bg.jpg';
+
+      document.body.style.backgroundImage = `url('images/${bg}')`;
+
+      for (let i = 0; i < 50; i++) {
+        cityList.push({
+          id: start + i,
+          name: `${prefix} ${i + 1}`,
+          defense: 20 + Math.floor(Math.random() * 40) + i * 5
+        });
+      }
+      return cityList;
     }
 
-    init() {
-        console.log("帝国初始化完成！");
+    function selectRace() {
+      race = document.getElementById('race').value;
+      localStorage.setItem('race', race);
+      cities = generateCities();
+      localStorage.setItem('cities', JSON.stringify(cities));
+      conquered = [];
+      currentMapIndex = 0;
+      updateUI();
     }
 
-    getTerritoryBonus(territoryName) {
-        const t = this.territories[territoryName];
-        const raceBonus = this.races[t.race].bonus;
-        const regionBonus = this.regions[t.region].bonus;
+    function unlockRaces() {
+      const keys = Object.keys(races);
+      if (!race) {
+        race = keys[Math.floor(Math.random() * keys.length)];
+        localStorage.setItem('race', race);
+      }
+      cities = generateCities();
+      localStorage.setItem('cities', JSON.stringify(cities));
 
-        return {
-            resources: raceBonus.resources * regionBonus.resources,
-            troops: raceBonus.troops * regionBonus.troops,
-            population: raceBonus.population * regionBonus.population
-        };
+      const sel = document.getElementById('race');
+      sel.innerHTML = '';
+      keys.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.innerText = `${races[r].name}：${races[r].bonus}`;
+        sel.appendChild(opt);
+      });
+      sel.value = race;
     }
 
-    gainExp(amount) {
-        this.player.exp += amount;
-        const required = this.player.level * 100;
-        if (this.player.exp >= required) {
-            this.player.level++;
-            this.player.exp -= required;
-            alert(`恭喜 ${this.player.name} 升到了 ${this.player.level} 级！`);
-        }
+    let currentMapIndex = 0;
+    function drawMap() {
+      const map = document.getElementById('map');
+      map.innerHTML = '';
+
+      const pageSize = 10;
+      const pageCities = cities.slice(currentMapIndex * pageSize, (currentMapIndex + 1) * pageSize);
+
+      pageCities.forEach(city => {
+        const btn = document.createElement('button');
+        btn.className = 'city-btn';
+        btn.innerText = city.name + (conquered.includes(city.id) ? ' ✅' : '');
+        btn.onclick = () => attack(city);
+        map.appendChild(btn);
+      });
+
+      const nav = document.createElement('div');
+      nav.style.marginTop = '10px';
+      if (currentMapIndex > 0) {
+        const prev = document.createElement('button');
+        prev.innerText = '← 上一页';
+        prev.onclick = () => { currentMapIndex--; drawMap(); };
+        nav.appendChild(prev);
+      }
+      if ((currentMapIndex + 1) * pageSize < cities.length) {
+        const next = document.createElement('button');
+        next.innerText = '下一页 →';
+        next.onclick = () => { currentMapIndex++; drawMap(); };
+        nav.appendChild(next);
+      }
+      map.appendChild(nav);
     }
 
-    collectResources() {
-        for (const name in this.territories) {
-            const bonus = this.getTerritoryBonus(name);
-            const territory = this.territories[name];
-            territory.resources += Math.floor(10 * bonus.resources);
-            territory.population += Math.floor(5 * bonus.population);
-        }
-        alert("资源已更新！");
+    function updateUI() {
+      document.getElementById('info').innerText =
+        `当前种族：${races[race].name}｜征服城市数：${conquered.length}｜技能冷却：${cooldown}秒`;
+      drawMap();
     }
 
-    addTerritory(name, region, race) {
-        if (this.territories[name]) {
-            alert("该领地已存在。");
-            return;
-        }
-        this.territories[name] = {
-            resources: 50,
-            troops: 20,
-            population: 500,
-            region,
-            race
-        };
-        this.player.territories.push(name);
-        alert(`成功新增领地：${name}`);
+    function attack(city) {
+      if (!conquered.includes(city.id)) {
+        conquered.push(city.id);
+        localStorage.setItem('conquered', JSON.stringify(conquered));
+        alert(`成功征服：${city.name}`);
+        updateUI();
+      } else {
+        alert(`${city.name} 已征服`);
+      }
     }
 
-    recruitTroops(territoryName, count) {
-        const territory = this.territories[territoryName];
-        if (!territory) return alert("领地不存在");
-        if (territory.population < count) return alert("人口不足征兵");
-
-        territory.troops += count;
-        territory.population -= count;
-        alert(`${territoryName} 征兵 ${count} 人。`);
+    function useSkill() {
+      if (cooldown > 0) {
+        alert("技能冷却中");
+        return;
+      }
+      races[race].skill();
+      cooldown = 30;
     }
 
-    battle(attackerName, defenderName) {
-        const attacker = this.territories[attackerName];
-        const defender = this.territories[defenderName];
-        if (!attacker || !defender) return alert("无效的战斗目标。");
-
-        const attackerBonus = this.getTerritoryBonus(attackerName).troops;
-        const defenderBonus = this.getTerritoryBonus(defenderName).troops;
-
-        const attackerPower = attacker.troops * attackerBonus;
-        const defenderPower = defender.troops * defenderBonus;
-
-        let result;
-        if (attackerPower > defenderPower) {
-            attacker.troops = Math.floor(attacker.troops * 0.7);
-            defender.troops = 0;
-            result = `${attackerName} 胜利，占领 ${defenderName}！`;
-            this.player.territories.push(defenderName);
-        } else if (attackerPower < defenderPower) {
-            attacker.troops = 0;
-            defender.troops = Math.floor(defender.troops * 0.7);
-            result = `${attackerName} 进攻失败，被击退。`;
-        } else {
-            attacker.troops = 0;
-            defender.troops = 0;
-            result = `双方同归于尽！`;
-        }
-
-        alert(result);
+    function addGold(amount) {
+      console.log("获得金币：", amount);
     }
 
-    render() {
-        const container = document.getElementById('game');
-        const player = this.player;
-        const capital = this.territories['首都'];
-
-        container.innerHTML = `
-            <h1>${player.name} 的帝国</h1>
-            <p>种族：${this.races[player.race].name.zh}</p>
-            <p>等级：${player.level}（经验：${player.exp}）</p>
-            <p>金币：${player.gold}</p>
-            <hr>
-            <h2>领地：首都</h2>
-            <p>资源：${capital.resources}</p>
-            <p>军队：${capital.troops}</p>
-            <p>人口：${capital.population}</p>
-            <hr>
-            <button onclick="game.collectResources(); game.render();">收集资源</button>
-            <button onclick="game.recruitTroops('首都', 10); game.render();">征兵 10</button>
-            <button onclick="game.gainExp(100); game.render();">获得经验 100</button>
-            <button onclick="game.addTerritory('敌营', 'mountain', 'orc'); game.render();">生成敌营</button>
-            <button onclick="game.battle('首都', '敌营'); game.render();">攻打敌营</button>
-        `;
+    function addArmy(amount) {
+      console.log("获得军队：", amount);
     }
-}
 
-// 启动游戏
-const game = new Empire();
-game.render();
+    function upgradeCity() {
+      console.log("城市升级！");
+    }
+
+    function unlockOtherMaps() {
+      const all = Object.keys(races);
+      const next = all.find(r => r !== race && !conquered.some(id => Math.floor(id / 100) === races[r].base / 100));
+      if (next) {
+        alert(`你已征服当前地图的大部分，前往新的种族地图：${races[next].name}`);
+        race = next;
+        localStorage.setItem('race', race);
+        cities = generateCities();
+        conquered = [];
+        currentMapIndex = 0;
+        updateUI();
+      }
+    }
+
+    setInterval(() => {
+      if (cooldown > 0) {
+        cooldown--;
+        updateUI();
+      }
+      if (conquered.length >= 40) {
+        unlockOtherMaps();
+      }
+    }, 1000);
+
+    window.onload = () => {
+      unlockRaces();
+      updateUI();
+    };
+  </script>
+</body>
+</html>
