@@ -1,209 +1,182 @@
-
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <title>帝国游戏</title>
+  <meta charset="UTF-8">
+  <title>帝国游戏 Empire Game</title>
   <style>
     body {
       margin: 0;
-      font-family: sans-serif;
-      color: white;
-      text-shadow: 1px 1px 3px black;
-      background-size: cover;
-      background-attachment: fixed;
+      background-color: #111;
+      font-family: 'Press Start 2P', monospace;
+      color: #fff;
+      overflow: hidden;
     }
-    .panel {
-      padding: 10px;
-      background: rgba(0,0,0,0.5);
-      max-width: 480px;
+    canvas {
+      display: none;
+      image-rendering: pixelated;
+      cursor: grab;
     }
-    #map button {
-      margin: 4px;
-      padding: 8px;
+    #city-popup, #start-screen {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #ccc;
+      padding: 20px;
+      z-index: 999;
+      text-align: center;
+    }
+    #start-screen button {
+      font-family: 'Press Start 2P', monospace;
       font-size: 16px;
+      background: #4caf50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    #start-screen h1 {
+      margin-bottom: 20px;
     }
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="panel">
-    <h1>帝国征服</h1>
-    <label for="race">选择种族：</label>
-    <select id="race" onchange="selectRace()"></select>
-    <p id="info"></p>
-    <button onclick="useSkill()">使用种族技能</button>
-    <div id="map"></div>
-  </div>
+<div id="start-screen">
+  <h1>帝国游戏</h1>
+  <p>万国觉醒：征服与荣耀</p>
+  <button onclick="startGame()">开始游戏</button>
+</div>
+<canvas id="gameCanvas" width="1200" height="800"></canvas>
+<script>
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('gameCanvas').style.display = 'block';
+  drawMap();
+}
 
-  <script>
-    let race = localStorage.getItem('race') || null;
-    let cities = [];
-    let conquered = JSON.parse(localStorage.getItem('conquered') || '[]');
-    let cooldown = 0;
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
 
-    const races = {
-      human: { name: '人类', bonus: '金币产量+20%', skill: () => addGold(200), base: 0 },
-      orc: { name: '兽人', bonus: '军队增长+2', skill: () => addArmy(50), base: 100 },
-      elf: { name: '精灵', bonus: '占领奖励翻倍', skill: () => addArmy(3), base: 200 },
-      undead: { name: '亡灵', bonus: '失败复活50%', skill: () => { addGold(50); addArmy(30); }, base: 300 },
-      dwarf: { name: '矮人', bonus: '城市升级便宜', skill: () => upgradeCity(), base: 400 }
-    };
+const cities = [
+  { name: "都城", x: 150, y: 150, level: 1, conquered: false, defense: 10, race: "人族" },
+  { name: "边境", x: 400, y: 120, level: 2, conquered: false, defense: 15, race: "兽人" },
+  { name: "矿区", x: 650, y: 220, level: 3, conquered: false, defense: 18, race: "矮人" },
+  { name: "森林", x: 300, y: 400, level: 2, conquered: false, defense: 12, race: "精灵" },
+  { name: "港口", x: 550, y: 450, level: 4, conquered: false, defense: 20, race: "人族" }
+];
 
-    function generateCities() {
-      let cityList = [];
-      let raceStart = {
-        human: { prefix: '王国', base: 0, bg: 'bg_human.jpg' },
-        orc: { prefix: '兽域', base: 100, bg: 'bg_orc.jpg' },
-        elf: { prefix: '精灵林', base: 200, bg: 'bg_elf.jpg' },
-        undead: { prefix: '亡魂地', base: 300, bg: 'bg_undead.jpg' },
-        dwarf: { prefix: '矮人山', base: 400, bg: 'bg_dwarf.jpg' }
-      };
+function drawMap() {
+  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+  ctx.fillStyle = '#222';
+  ctx.fillRect(-offsetX / scale, -offsetY / scale, canvas.width / scale, canvas.height / scale);
 
-      let start = raceStart[race]?.base || 0;
-      let prefix = raceStart[race]?.prefix || '敌城';
-      let bg = raceStart[race]?.bg || 'default_bg.jpg';
-
-      document.body.style.backgroundImage = `url('images/${bg}')`;
-
-      for (let i = 0; i < 50; i++) {
-        cityList.push({
-          id: start + i,
-          name: `${prefix} ${i + 1}`,
-          defense: 20 + Math.floor(Math.random() * 40) + i * 5
-        });
-      }
-      return cityList;
+  cities.forEach(city => {
+    ctx.fillStyle = city.conquered ? '#4caf50' : (aiCities.includes(city.name) ? '#f44336' : '#ccc');
+    ctx.fillRect(city.x - 10, city.y - 10, 20, 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px "Press Start 2P"';
+    ctx.fillText(city.name, city.x - 20, city.y - 15);
+    ctx.fillText(city.race, city.x - 20, city.y + 40);
+    for (let i = 0; i < city.level; i++) {
+      ctx.fillText('★', city.x - 8 + i * 10, city.y + 25);
     }
+  });
+}
 
-    function selectRace() {
-      race = document.getElementById('race').value;
-      localStorage.setItem('race', race);
-      cities = generateCities();
-      localStorage.setItem('cities', JSON.stringify(cities));
-      conquered = [];
-      currentMapIndex = 0;
-      updateUI();
+canvas.addEventListener("click", e => {
+  const x = (e.offsetX - offsetX) / scale;
+  const y = (e.offsetY - offsetY) / scale;
+  cities.forEach(city => {
+    if (x >= city.x - 10 && x <= city.x + 10 && y >= city.y - 10 && y <= city.y + 10) {
+      showCityPopup(city);
     }
+  });
+});
 
-    function unlockRaces() {
-      const keys = Object.keys(races);
-      if (!race) {
-        race = keys[Math.floor(Math.random() * keys.length)];
-        localStorage.setItem('race', race);
-      }
-      cities = generateCities();
-      localStorage.setItem('cities', JSON.stringify(cities));
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+  scale *= zoom;
+  drawMap();
+});
 
-      const sel = document.getElementById('race');
-      sel.innerHTML = '';
-      keys.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r;
-        opt.innerText = `${races[r].name}：${races[r].bonus}`;
-        sel.appendChild(opt);
-      });
-      sel.value = race;
+function showCityPopup(city) {
+  const popup = document.createElement('div');
+  popup.id = 'city-popup';
+  popup.innerHTML = `
+    <h3>${city.name}</h3>
+    <p>种族：${city.race}</p>
+    <p>等级：${city.level} ⭐</p>
+    <p>防御力：${city.defense}</p>
+    <p>状态：${city.conquered ? '我方控制' : (aiCities.includes(city.name) ? '敌方控制' : '中立')}</p>
+    ${!city.conquered ? '<button onclick="attack(cities.find(c=>c.name===\'' + city.name + '\'))">发起进攻</button>' : ''}
+    <br><button onclick="document.getElementById('city-popup').remove()">关闭</button>
+  `;
+  document.body.appendChild(popup);
+}
+
+let resources = 100;
+let army = 50;
+let aiCities = [];
+
+function attack(city) {
+  if (city.conquered) return alert('此城市已被占领');
+  if (army < 10) return alert('兵力不足，无法进攻！');
+  const result = army - (city.defense + (city.tower ? 10 : 0)) + city.level * 5;
+  const win = result >= 0;
+  if (win) {
+    city.conquered = true;
+    city.garrison = 5;
+    city.level = Math.min(city.level + 1, 5);
+    resources += city.level * 20;
+    drawMap();
+  } else {
+    alert('进攻失败');
+  }
+  army -= 10;
+}
+
+function aiAttack() {
+  const targets = cities.filter(c => c.conquered);
+  const empty = cities.filter(c => !c.conquered && !aiCities.includes(c.name));
+  if (Math.random() < 0.5 && empty.length > 0) {
+    const target = empty[Math.floor(Math.random() * empty.length)];
+    aiCities.push(target.name);
+    drawMap();
+    return;
+  }
+  if (targets.length === 0) return;
+  const target = targets[Math.floor(Math.random() * targets.length)];
+  const aiPower = 20 + Math.floor(Math.random() * 30);
+  const defense = (target.garrison || 0) + (target.tower ? 10 : 0);
+  const win = aiPower > defense;
+  if (win) {
+    target.conquered = false;
+    target.garrison = 0;
+    aiCities.push(target.name);
+    alert(`⚔️ 敌军占领了你的城市：${target.name}`);
+    drawMap();
+  }
+}
+
+setInterval(() => {
+  cities.forEach(city => {
+    if (city.conquered) {
+      resources += city.level * 2;
+      if (city.garrison < 20) city.garrison += 1;
     }
+  });
+  if (army < 100) army += 1;
+}, 5000);
 
-    let currentMapIndex = 0;
-    function drawMap() {
-      const map = document.getElementById('map');
-      map.innerHTML = '';
-
-      const pageSize = 10;
-      const pageCities = cities.slice(currentMapIndex * pageSize, (currentMapIndex + 1) * pageSize);
-
-      pageCities.forEach(city => {
-        const btn = document.createElement('button');
-        btn.className = 'city-btn';
-        btn.innerText = city.name + (conquered.includes(city.id) ? ' ✅' : '');
-        btn.onclick = () => attack(city);
-        map.appendChild(btn);
-      });
-
-      const nav = document.createElement('div');
-      nav.style.marginTop = '10px';
-      if (currentMapIndex > 0) {
-        const prev = document.createElement('button');
-        prev.innerText = '← 上一页';
-        prev.onclick = () => { currentMapIndex--; drawMap(); };
-        nav.appendChild(prev);
-      }
-      if ((currentMapIndex + 1) * pageSize < cities.length) {
-        const next = document.createElement('button');
-        next.innerText = '下一页 →';
-        next.onclick = () => { currentMapIndex++; drawMap(); };
-        nav.appendChild(next);
-      }
-      map.appendChild(nav);
-    }
-
-    function updateUI() {
-      document.getElementById('info').innerText =
-        `当前种族：${races[race].name}｜征服城市数：${conquered.length}｜技能冷却：${cooldown}秒`;
-      drawMap();
-    }
-
-    function attack(city) {
-      if (!conquered.includes(city.id)) {
-        conquered.push(city.id);
-        localStorage.setItem('conquered', JSON.stringify(conquered));
-        alert(`成功征服：${city.name}`);
-        updateUI();
-      } else {
-        alert(`${city.name} 已征服`);
-      }
-    }
-
-    function useSkill() {
-      if (cooldown > 0) {
-        alert("技能冷却中");
-        return;
-      }
-      races[race].skill();
-      cooldown = 30;
-    }
-
-    function addGold(amount) {
-      console.log("获得金币：", amount);
-    }
-
-    function addArmy(amount) {
-      console.log("获得军队：", amount);
-    }
-
-    function upgradeCity() {
-      console.log("城市升级！");
-    }
-
-    function unlockOtherMaps() {
-      const all = Object.keys(races);
-      const next = all.find(r => r !== race && !conquered.some(id => Math.floor(id / 100) === races[r].base / 100));
-      if (next) {
-        alert(`你已征服当前地图的大部分，前往新的种族地图：${races[next].name}`);
-        race = next;
-        localStorage.setItem('race', race);
-        cities = generateCities();
-        conquered = [];
-        currentMapIndex = 0;
-        updateUI();
-      }
-    }
-
-    setInterval(() => {
-      if (cooldown > 0) {
-        cooldown--;
-        updateUI();
-      }
-      if (conquered.length >= 40) {
-        unlockOtherMaps();
-      }
-    }, 1000);
-
-    window.onload = () => {
-      unlockRaces();
-      updateUI();
-    };
-  </script>
+setInterval(() => {
+  aiAttack();
+}, 15000);
+</script>
 </body>
 </html>
