@@ -4,94 +4,108 @@
   <meta charset="UTF-8">
   <title>帝国游戏 Empire Game</title>
   <style>
-    body {
+    html, body {
       margin: 0;
-      background: black;
       overflow: hidden;
-      font-family: 'Press Start 2P', monospace;
+      background: black;
     }
     canvas {
       display: block;
       margin: 0 auto;
-      background-color: #222;
+      background: url('https://i.imgur.com/vMBT2kW.png') no-repeat center center;
+      background-size: cover;
       image-rendering: pixelated;
     }
+    #infoBox {
+      position: absolute;
+      top: 10px; left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.7);
+      padding: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      border: 1px solid white;
+      display: none;
+    }
   </style>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-<canvas id="gameCanvas" width="1024" height="768"></canvas>
-<audio id="upgrade-sfx" src="https://cdn.pixabay.com/download/audio/2022/10/24/audio_7e3ae7d295.mp3" preload="auto"></audio>
-<audio id="capture-sfx" src="https://cdn.pixabay.com/download/audio/2021/09/08/audio_96b6ec56c5.mp3" preload="auto"></audio>
+<canvas id="gameCanvas" width="1280" height="720"></canvas>
+<div id="infoBox"></div>
+<audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/28/audio_d1fa265ae1.mp3" autoplay loop></audio>
+<audio id="upgrade-sfx" src="https://cdn.pixabay.com/download/audio/2022/10/24/audio_7e3ae7d295.mp3"></audio>
+<audio id="capture-sfx" src="https://cdn.pixabay.com/download/audio/2021/09/08/audio_96b6ec56c5.mp3"></audio>
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const upgradeSFX = document.getElementById("upgrade-sfx");
 const captureSFX = document.getElementById("capture-sfx");
+const infoBox = document.getElementById("infoBox");
 
+let scale = 1;
 let tick = 0;
+
 const cities = [
-  { id: 1, name: "王都", x: 200, y: 150, owner: "玩家", level: 1, food: 100, gold: 100 },
-  { id: 2, name: "北境", x: 400, y: 120, owner: "AI", level: 1, food: 100, gold: 100 },
-  { id: 3, name: "南方", x: 700, y: 500, owner: "AI", level: 1, food: 100, gold: 100 },
-  { id: 4, name: "东海", x: 300, y: 600, owner: "AI", level: 1, food: 100, gold: 100 }
+  { name: "王都", x: 300, y: 200, owner: "玩家", level: 1, food: 100, gold: 100 },
+  { name: "北境", x: 500, y: 100, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "东海", x: 700, y: 300, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "南荒", x: 200, y: 500, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "雪原", x: 950, y: 150, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "山谷", x: 400, y: 400, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "月城", x: 800, y: 550, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "火城", x: 600, y: 620, owner: "AI", level: 1, food: 100, gold: 100 },
+  { name: "风港", x: 1000, y: 400, owner: "AI", level: 1, food: 100, gold: 100 }
 ];
 
-function drawCities() {
+function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (const city of cities) {
     ctx.beginPath();
-    ctx.arc(city.x, city.y, 10 + city.level * 2, 0, 2 * Math.PI);
+    ctx.arc(city.x * scale, city.y * scale, 10 + city.level, 0, 2 * Math.PI);
     ctx.fillStyle = city.owner === "玩家" ? "#4caf50" : "#f44336";
     ctx.fill();
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = "white";
     ctx.stroke();
-    ctx.font = "10px sans-serif";
     ctx.fillStyle = "white";
-    ctx.fillText(`${city.name} ★${city.level}`, city.x - 20, city.y - 15);
-    ctx.fillText(`粮:${city.food}`, city.x - 20, city.y + 20);
-    ctx.fillText(`金:${city.gold}`, city.x - 20, city.y + 32);
+    ctx.fillText(`${city.name} ★${city.level}`, city.x * scale - 20, city.y * scale - 15);
   }
 }
 
-function playCaptureAnimation(x, y) {
-  let alpha = 1.0;
+function captureAnimation(city) {
   captureSFX.play();
-  const interval = setInterval(() => {
+  let alpha = 1;
+  let radius = 30;
+  const ani = setInterval(() => {
     ctx.beginPath();
-    ctx.arc(x, y, 30, 0, 2 * Math.PI);
-    ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`;
-    ctx.lineWidth = 3;
+    ctx.arc(city.x * scale, city.y * scale, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,0,${alpha})`;
     ctx.stroke();
+    radius += 3;
     alpha -= 0.05;
-    if (alpha <= 0) clearInterval(interval);
+    if (alpha <= 0) clearInterval(ani);
   }, 50);
 }
 
 function getDistance(a, b) {
-  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+  return (a.x - b.x)**2 + (a.y - b.y)**2;
 }
 
-function aiAttack() {
-  for (const city of cities) {
-    if (city.owner === "AI") {
-      const targets = cities.filter(c => c.owner === "玩家");
-      if (targets.length > 0) {
-        targets.sort((a, b) => getDistance(city, a) - getDistance(city, b) || a.level - b.level);
-        const target = targets[0];
-        target.owner = "AI";
-        playCaptureAnimation(target.x, target.y);
-        console.log(`AI 占领了 ${target.name}`);
-      }
-    }
+function aiTurn() {
+  const aiCities = cities.filter(c => c.owner === "AI");
+  for (const city of aiCities) {
+    const targets = cities.filter(c => c.owner !== "AI");
+    if (targets.length === 0) return;
+    targets.sort((a, b) => getDistance(city, a) - getDistance(city, b));
+    const target = targets[0];
+    target.owner = "AI";
+    captureAnimation(target);
   }
-  drawCities();
 }
 
 function resourceTick() {
-  for (const city of cities) {
-    city.food += 10 * city.level;
-    city.gold += 5 * city.level;
+  for (const c of cities) {
+    c.food += 10 * c.level;
+    c.gold += 5 * c.level;
   }
 }
 
@@ -99,33 +113,44 @@ canvas.addEventListener("click", e => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  for (const city of cities) {
-    const dx = city.x - x;
-    const dy = city.y - y;
-    if (dx * dx + dy * dy < 400 && city.owner === "玩家") {
-      const cost = city.level * 50;
-      if (city.food >= cost && city.gold >= cost && city.level < 5) {
-        city.level++;
-        city.food -= cost;
-        city.gold -= cost;
-        upgradeSFX.play();
-        console.log(`城市 ${city.name} 升级为 ${city.level} 级`);
+  for (const c of cities) {
+    const dx = c.x * scale - x;
+    const dy = c.y * scale - y;
+    if (dx*dx + dy*dy < 400) {
+      if (c.owner === "玩家") {
+        const cost = 50 * c.level;
+        if (c.gold >= cost && c.food >= cost && c.level < 5) {
+          c.gold -= cost;
+          c.food -= cost;
+          c.level++;
+          upgradeSFX.play();
+        }
       }
+      infoBox.style.left = `${x + 10}px`;
+      infoBox.style.top = `${y + 10}px`;
+      infoBox.innerHTML = `${c.name}<br>等级: ★${c.level}<br>金: ${c.gold} 粮: ${c.food}<br>归属: ${c.owner}`;
+      infoBox.style.display = "block";
+      return;
     }
   }
-  drawCities();
+  infoBox.style.display = "none";
 });
 
-function gameLoop() {
+canvas.addEventListener("wheel", e => {
+  if (e.deltaY < 0) scale = Math.min(2, scale + 0.1);
+  else scale = Math.max(0.5, scale - 0.1);
+});
+
+function loop() {
   tick++;
-  if (tick % 300 === 0) aiAttack();
+  if (tick % 300 === 0) aiTurn();
   if (tick % 60 === 0) resourceTick();
-  drawCities();
-  requestAnimationFrame(gameLoop);
+  draw();
+  requestAnimationFrame(loop);
 }
 
-drawCities();
-gameLoop();
+draw();
+loop();
 </script>
 </body>
 </html>
